@@ -1,12 +1,13 @@
 import React from "react";
 import Axios from "axios";
 import Container from "@material-ui/core/Container";
-import Typography from "@material-ui/core/Typography";
 import TextField from "@material-ui/core/TextField";
 import Button from "@material-ui/core/Button";
 import { withStyles } from "@material-ui/core/styles";
 import Book from "./components/book";
 import Blueprint from "./components/blueprint";
+import Alert from "@material-ui/lab/Alert";
+import Pagination from "@material-ui/lab/Pagination";
 
 const styles = () => ({
   contain: {
@@ -19,6 +20,14 @@ const styles = () => ({
     display: "flex",
     flexFlow: "row wrap",
   },
+  alertCenter: {
+    margin: "10px auto",
+  },
+  ul: {
+    "& > *": {
+      justifyContent: "center",
+    },
+  },
 });
 
 class App extends React.Component {
@@ -27,11 +36,13 @@ class App extends React.Component {
     this.state = {
       term: "",
       results: null,
+      pages: 0,
+      page: 1,
       loading: false,
+      error: false,
     };
   }
 
-  componentDidMount() {}
   handleChange(e) {
     this.setState({ term: e.target.value });
   }
@@ -40,28 +51,49 @@ class App extends React.Component {
     const { term } = this.state;
     const apiUrl = `https://goodreads-server-express--dotdash.repl.co/search/${term}`;
     this.setState({ loading: true });
-    Axios.get(apiUrl).then((res) => {
-      this.setState({ results: res.data.list });
-      this.setState({ loading: false, term: "" });
-    });
+    Axios.get(apiUrl)
+      .then((res) => {
+        console.log(res.data.list.length);
+        this.setState({
+          results: res.data.list,
+          pages: Math.ceil(res.data.list.length / 6),
+        });
+        this.setState({ loading: false, term: "" });
+      })
+      .catch((err) => {
+        console.error(err);
+        this.setState({ loading: false, term: "", error: true });
+      });
   }
   listing() {
-    const { results } = this.state;
-    if (results)
-      return results.map((info, i) => {
+    const { classes } = this.props;
+    const { results, page, error } = this.state;
+    if (error) {
+      return (
+        <Alert className={classes.alertCenter} severity="error">
+          No books found
+        </Alert>
+      );
+    } else if (results) {
+      const show = results.slice(6 * (page - 1), 6 * page);
+      return show.map((info, i) => {
         return <Book info={info} key={i} />;
       });
+    }
+  }
+
+  handlePage(e) {
+    console.log(e.target.innerText);
+    this.setState({ page: e.target.innerText });
   }
 
   render() {
     const { classes } = this.props;
-    const { term, loading } = this.state;
+    const { term, loading, pages, error, results } = this.state;
     return (
       <Container className={classes.contain} maxWidth="lg">
-        <Typography variant="h2">Good Reads</Typography>
-        <Typography variant="body1">
-          Search and find books that you love
-        </Typography>
+        <h1>Good Reads</h1>
+        <p>Search and find books that you love</p>
         <form onSubmit={(e) => this.handleSubmit(e)}>
           <TextField
             id="outlined-basic"
@@ -81,10 +113,17 @@ class App extends React.Component {
             search
           </Button>
         </form>
-
         <div className={classes.list}>
           {loading ? <Blueprint /> : this.listing()}
         </div>
+        {!error && results ? (
+          <Pagination
+            className={classes.ul}
+            count={pages}
+            shape="rounded"
+            onChange={(e) => this.handlePage(e)}
+          />
+        ) : null}
       </Container>
     );
   }
